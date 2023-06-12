@@ -29,41 +29,47 @@
 
 (define-public (stack (amount uint))
   (match (get-user-stacks tx-sender)
-    user-stacks 
-      (if (>= (stx-get-balance tx-sender) amount)
-        (begin
-          (map-set user-stacks 
-            { user: tx-sender }
-            { stacked: (+ (get stacked user-stacks) amount) })
-          (map-set total-stacks
-            { id: u1 }
-            { total: (+ (get total (get-total-stacks)) amount) })
-          (ok amount)
+    current-stacks 
+      (begin
+        (if (>= (stx-get-balance tx-sender) amount)
+          (begin
+            (map-set user-stacks 
+              { user: tx-sender }
+              { stacked: (+ (get stacked current-stacks) amount) })
+            (map-set total-stacks
+              { id: u1 }
+              { total: (+ (get total (get-total-stacks)) amount) })
+            (ok amount)
+          )
+          (err ERR_STACK_INSUFFICIENT_FUNDS)
         )
-        (err ERR_STACK_INSUFFICIENT_FUNDS)
       )
-    none 
-      (err ERR_USER_NOT_FOUND)
+    (err ERR_USER_NOT_FOUND)
   )
 )
+
+
 
 
 (define-public (unstack (amount uint))
-  (let ((user-stacks (get-user-stacks tx-sender)))
-    (if (>= (get stacked user-stacks) amount)
-      (begin
-        (map-set user-stacks 
-          { user: tx-sender }
-          { stacked: (- (get stacked user-stacks) amount) })
-        (map-set total-stacks
-          { id: u1 }
-          { total: (- (get total (get-total-stacks)) amount) })
-        (ok amount)
+  (match (get-user-stacks tx-sender)
+    current-stacks
+      (if (>= (get stacked current-stacks) amount)
+        (begin
+          (map-set user-stacks 
+            { user: tx-sender }
+            { stacked: (- (get stacked current-stacks) amount) })
+          (map-set total-stacks
+            { id: u1 }
+            { total: (- (get total (get-total-stacks)) amount) })
+          (ok amount)
+        )
+        (err ERR_UNSTACK_INSUFFICIENT_STACKED)
       )
-      (err ERR_UNSTACK_INSUFFICIENT_STACKED)
-    )
+    (err ERR_USER_NOT_FOUND)
   )
 )
+
 
 (define-read-only (get-stack-info (user principal))
   (get-user-stacks user)
