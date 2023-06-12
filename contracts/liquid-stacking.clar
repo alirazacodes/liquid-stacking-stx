@@ -48,9 +48,6 @@
   )
 )
 
-
-
-
 (define-public (unstack (amount uint))
   (match (get-user-stacks tx-sender)
     current-stacks
