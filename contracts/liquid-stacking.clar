@@ -7,6 +7,8 @@
 (define-constant ERR_STACK_INSUFFICIENT_FUNDS u1)
 (define-constant ERR_UNSTACK_INSUFFICIENT_STACKED u2)
 (define-constant ERR_USER_NOT_FOUND u3)
+(define-constant ERR_USER_ALREADY_EXISTS u4)
+(define-constant ERR_USER_ALREADY_INITIALIZED u5)
 
 (define-map user-stacks
   { user: principal }
@@ -26,6 +28,19 @@
     (map-get? total-stacks { id: u1 })
   )
 )
+
+(define-public (init-user)
+  (if (is-none (map-get? user-stacks { user: tx-sender }))
+    (begin
+      (map-set user-stacks 
+        { user: tx-sender }
+        { stacked: u0 })
+      (ok tx-sender)
+    )
+    (err ERR_USER_ALREADY_INITIALIZED)
+  )
+)
+
 
 (define-public (stack (amount uint))
   (match (get-user-stacks tx-sender)
@@ -69,7 +84,11 @@
 
 
 (define-read-only (get-stack-info (user principal))
-  (get-user-stacks user)
+  (match (map-get? user-stacks { user: user })
+    entry (ok entry)
+    (err ERR_USER_NOT_FOUND)
+  )
 )
+
 
 

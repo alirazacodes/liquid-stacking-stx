@@ -12,12 +12,32 @@ const ERR_UNSTACK_INSUFFICIENT_STACKED = 2;
 const ERR_USER_NOT_FOUND = 3;
 
 Clarinet.test({
+  name: "Ensure that user initialization works",
+  async fn(chain: Chain, accounts: Map<string, Account>) {
+    let wallet1 = accounts.get("wallet_1")!;
+
+    let block = chain.mineBlock([
+      Tx.contractCall("liquid-stacking", "init-user", [], wallet1.address),
+    ]);
+
+    assertEquals(block.receipts.length, 1);
+    assertEquals(block.receipts[0].result, `(ok ${wallet1.address})`);
+  },
+});
+
+Clarinet.test({
   name: "Ensure that stacking works when the user has sufficient funds",
   async fn(chain: Chain, accounts: Map<string, Account>) {
     let wallet1 = accounts.get("wallet_1")!;
 
-    // The user tries to stack 1000 STX.
+    // First, initialize the user
     let block = chain.mineBlock([
+      Tx.contractCall("liquid-stacking", "init-user", [], wallet1.address),
+    ]);
+    assertEquals(block.receipts[0].result, `(ok ${wallet1.address})`);
+
+    // Then, the user tries to stack 1000 STX.
+    block = chain.mineBlock([
       Tx.contractCall(
         "liquid-stacking",
         "stack",
@@ -36,13 +56,21 @@ Clarinet.test({
   name: "Ensure that stacking fails when the user does not have sufficient funds",
   async fn(chain: Chain, accounts: Map<string, Account>) {
     let wallet1 = accounts.get("wallet_1")!;
+    let wallet1InitialBalance = wallet1.balance; // Get initial balance of wallet1
+
+    // First, initialize the user
+    let block = chain.mineBlock([
+      Tx.contractCall("liquid-stacking", "init-user", [], wallet1.address),
+    ]);
+    assertEquals(block.receipts[0].result, `(ok ${wallet1.address})`);
 
     // The user tries to stack more STX than they have.
-    let block = chain.mineBlock([
+    block = chain.mineBlock([
       Tx.contractCall(
         "liquid-stacking",
         "stack",
-        [types.uint(1000000000)],
+        // Try to stack more than the initial balance of the wallet
+        [types.uint(wallet1InitialBalance + 1000000)], // Assuming the balance is in microSTX
         wallet1.address
       ),
     ]);
@@ -61,8 +89,21 @@ Clarinet.test({
   async fn(chain: Chain, accounts: Map<string, Account>) {
     let wallet1 = accounts.get("wallet_1")!;
 
-    // The user tries to unstack 500 STX.
+    // First, initialize the user and stack some STX
     let block = chain.mineBlock([
+      Tx.contractCall("liquid-stacking", "init-user", [], wallet1.address),
+      Tx.contractCall(
+        "liquid-stacking",
+        "stack",
+        [types.uint(1000)],
+        wallet1.address
+      ),
+    ]);
+    assertEquals(block.receipts[0].result, `(ok ${wallet1.address})`);
+    assertEquals(block.receipts[1].result, "(ok u1000)");
+
+    // The user tries to unstack 500 STX.
+    block = chain.mineBlock([
       Tx.contractCall(
         "liquid-stacking",
         "unstack",
@@ -82,8 +123,21 @@ Clarinet.test({
   async fn(chain: Chain, accounts: Map<string, Account>) {
     let wallet1 = accounts.get("wallet_1")!;
 
-    // The user tries to unstack more STX than they have stacked.
+    // First, initialize the user and stack some STX
     let block = chain.mineBlock([
+      Tx.contractCall("liquid-stacking", "init-user", [], wallet1.address),
+      Tx.contractCall(
+        "liquid-stacking",
+        "stack",
+        [types.uint(500)],
+        wallet1.address
+      ),
+    ]);
+    assertEquals(block.receipts[0].result, `(ok ${wallet1.address})`);
+    assertEquals(block.receipts[1].result, "(ok u500)");
+
+    // The user tries to unstack more STX than they have stacked.
+    block = chain.mineBlock([
       Tx.contractCall(
         "liquid-stacking",
         "unstack",
@@ -106,8 +160,25 @@ Clarinet.test({
   async fn(chain: Chain, accounts: Map<string, Account>) {
     let wallet1 = accounts.get("wallet_1")!;
 
-    // Get the user's stack info.
+    // First, initialize the user
     let block = chain.mineBlock([
+      Tx.contractCall("liquid-stacking", "init-user", [], wallet1.address),
+    ]);
+    assertEquals(block.receipts[0].result, `(ok ${wallet1.address})`);
+
+    // Then, stack some STX
+    block = chain.mineBlock([
+      Tx.contractCall(
+        "liquid-stacking",
+        "stack",
+        [types.uint(500)],
+        wallet1.address
+      ),
+    ]);
+    assertEquals(block.receipts[0].result, "(ok u500)");
+
+    // Get the user's stack info.
+    block = chain.mineBlock([
       Tx.contractCall(
         "liquid-stacking",
         "get-stack-info",
@@ -120,8 +191,11 @@ Clarinet.test({
     assertEquals(block.receipts.length, 1);
     let stackInfo = block.receipts[0].result.expectOk().expectTuple();
 
+    // Parse the returned value to an integer
+    let stackedAmount = parseInt(stackInfo["stacked"].substring(1));
+
     // Check that the returned information is correct.
-    assertEquals(stackInfo["stacked"].value, 500); // This value depends on the amount you stacked/unstacked in the previous tests.
+    assertEquals(stackedAmount, 500);
   },
 });
 
@@ -129,8 +203,7 @@ Clarinet.test({
   name: "Ensure that get-stack-info fails when the user is not found",
   async fn(chain: Chain, accounts: Map<string, Account>) {
     let wallet2 = accounts.get("wallet_2")!;
-
-    // Try to get the stack info for a user that has not stacked any STX.
+    // Ensure that wallet_2 is not initialized as a user
     let block = chain.mineBlock([
       Tx.contractCall(
         "liquid-stacking",
