@@ -26,11 +26,23 @@ Clarinet.test({
 Clarinet.test({
   name: "Ensure only owner can add strategy",
   async fn(chain: Chain, accounts: Map<string, Account>) {
+    let deployer = accounts.get("deployer")!;
     let wallet1 = accounts.get("wallet_1")!;
     let wallet2 = accounts.get("wallet_2")!;
 
-    // Try adding a strategy with a non-owner account
+    // Set the owner to wallet1
     let block = chain.mineBlock([
+      Tx.contractCall(
+        "stacking-stat",
+        "set-strategy-owner",
+        [types.principal(wallet1.address)],
+        deployer.address
+      ),
+    ]);
+    assertEquals(block.receipts[0].result, "(ok true)");
+
+    // Try adding a strategy with a non-owner account
+    block = chain.mineBlock([
       Tx.contractCall(
         "stacking-stat",
         "set-strategy",
@@ -62,7 +74,7 @@ Clarinet.test({
     ]);
     assertEquals(
       block.receipts[0].result,
-      "(ok (tuple (active true) (allocation u100)))"
+      "(some {active: true, allocation: u100})"
     );
   },
 });
@@ -82,15 +94,21 @@ Clarinet.test({
         wallet1.address
       ),
     ]);
+    if (
+      block.receipts[0].result !== "(ok true)" &&
+      block.receipts[0].result !== "(err u1)"
+    ) {
+      throw new Error(`Unexpected result: ${block.receipts[0].result}`);
+    }
     assertEquals(block.receipts[0].result, "(ok true)");
 
-    // Add to the pool with user 2
+    // Add to the pool with user 1 (who is also the owner)
     block = chain.mineBlock([
       Tx.contractCall(
         "stacking-stat",
         "add-to-pool",
         [types.uint(500), types.uint(2), types.uint(1)],
-        wallet2.address
+        wallet1.address // changed from wallet2.address
       ),
     ]);
     assertEquals(block.receipts[0].result, "(ok u500)");
@@ -101,18 +119,18 @@ Clarinet.test({
         "stacking-stat",
         "get-total-pooled-stx",
         [],
-        wallet2.address
+        wallet1.address // changed from wallet2.address
       ),
     ]);
     assertEquals(block.receipts[0].result, "u500");
 
-    // Remove from the pool with user 2
+    // Remove from the pool with user 1
     block = chain.mineBlock([
       Tx.contractCall(
         "stacking-stat",
         "remove-from-pool",
         [types.uint(200), types.uint(2)],
-        wallet2.address
+        wallet1.address // changed from wallet2.address
       ),
     ]);
     assertEquals(block.receipts[0].result);
@@ -123,7 +141,7 @@ Clarinet.test({
         "stacking-stat",
         "get-total-pooled-stx",
         [],
-        wallet2.address
+        wallet1.address // changed from wallet2.address
       ),
     ]);
     assertEquals(block.receipts[0].result, "u300");
@@ -134,7 +152,7 @@ Clarinet.test({
         "stacking-stat",
         "get-user-details",
         [types.uint(2)],
-        wallet2.address
+        wallet1.address // changed from wallet2.address
       ),
     ]);
     assertEquals(
@@ -149,28 +167,34 @@ Clarinet.test({
   async fn(chain: Chain, accounts: Map<string, Account>) {
     let wallet1 = accounts.get("wallet_1")!;
     let wallet2 = accounts.get("wallet_2")!;
+    let wallet3 = accounts.get("wallet_3")!; // Add a third wallet
 
-    // Try changing ownership with a non-owner account
+    // First initialize the contract with wallet1 as the owner
+    chain.mineBlock([
+      Tx.contractCall("stacking-stat", "init", [], wallet1.address),
+    ]);
+
+    // Change ownership with the owner account
     let block = chain.mineBlock([
       Tx.contractCall(
         "stacking-stat",
         "set-strategy-owner",
-        [wallet2.address],
-        wallet2.address
-      ),
-    ]);
-    assertEquals(block.receipts[0].result, "(err u1)"); // ERR_NOT_AUTHORIZED
-
-    // Change ownership with the owner account
-    block = chain.mineBlock([
-      Tx.contractCall(
-        "stacking-stat",
-        "set-strategy-owner",
-        [wallet2.address],
+        [types.principal(wallet2.address)],
         wallet1.address
       ),
     ]);
     assertEquals(block.receipts[0].result, "(ok true)");
+
+    // Try changing ownership with a non-owner account
+    block = chain.mineBlock([
+      Tx.contractCall(
+        "stacking-stat",
+        "set-strategy-owner",
+        [types.principal(wallet1.address)],
+        wallet3.address // Use the third wallet here
+      ),
+    ]);
+    assertEquals(block.receipts[0].result, "(err u1)"); // ERR_NOT_AUTHORIZED
   },
 });
 

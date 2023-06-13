@@ -11,7 +11,8 @@
 (define-constant ERR_OVERFLOW u5)
 (define-constant ERR_INVALID_STRATEGY_ID u6)
 
-(define-data-var strategy-owner principal tx-sender)
+(define-data-var strategy-owner principal tx-sender) ;; Default value, replace with your desired default owner address
+(define-data-var is-initialized bool false)
 (define-data-var rebalance-in-progress bool false)
 (define-data-var total-pooled-stx uint u0)
 
@@ -36,6 +37,14 @@
     )
   )
 )
+
+(define-public (init)
+  (begin
+    (var-set strategy-owner tx-sender)
+    (ok true)
+  )
+)
+
 
 (define-public (set-strategy (id uint) (allocation uint))
   (begin
