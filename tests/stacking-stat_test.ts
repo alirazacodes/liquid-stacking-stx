@@ -146,7 +146,7 @@ Clarinet.test({
     ]);
     assertEquals(
       block.receipts[0].result,
-      `(some (tuple (amount u500) (strategy-id u1)))`
+      `(some {amount: u500, strategy-id: u1})`
     );
 
     // Check the...total pooled stx
@@ -169,7 +169,7 @@ Clarinet.test({
         wallet1.address // changed from wallet2.address
       ),
     ]);
-    assertEquals(block.receipts[0].result);
+    assertEquals(block.receipts[0].result, "(ok u200)");
 
     // Check the total pooled stx after removal
     block = chain.mineBlock([
@@ -193,7 +193,7 @@ Clarinet.test({
     ]);
     assertEquals(
       block.receipts[0].result,
-      `(some (tuple (amount u300) (strategy-id u1)))`
+      `(some {amount: u300, strategy-id: u1})`
     );
   },
 });
