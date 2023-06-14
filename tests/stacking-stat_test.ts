@@ -7,6 +7,27 @@ import {
 } from "https://deno.land/x/clarinet@v1.4.0/index.ts";
 import { assertEquals } from "https://deno.land/std@0.170.0/testing/asserts.ts";
 
+function clarityValueToString(value: any): string {
+  if (value === null) {
+    return "none";
+  } else if (typeof value === "object") {
+    const entries = Object.entries(value);
+    if (entries.length === 1 && entries[0][0] === "") {
+      // This is an optional
+      return `(some ${clarityValueToString(entries[0][1])})`;
+    } else {
+      // This is a tuple
+      const keyValuePairs = entries.map(
+        ([k, v]) => `(${k} ${clarityValueToString(v)})`
+      );
+      return `(tuple ${keyValuePairs.join(" ")})`;
+    }
+  } else {
+    // This is a primitive value
+    return String(value);
+  }
+}
+
 Clarinet.test({
   name: "Ensure that the contract initializes with correct default values",
   async fn(chain: Chain, accounts: Map<string, Account>) {
@@ -84,14 +105,15 @@ Clarinet.test({
   async fn(chain: Chain, accounts: Map<string, Account>) {
     let wallet1 = accounts.get("wallet_1")!;
     let wallet2 = accounts.get("wallet_2")!;
+    let deployer = accounts.get("deployer")!; // Get the deployer account
 
-    // Add a strategy with the owner account
+    // Add a strategy with the owner (deployer) account
     let block = chain.mineBlock([
       Tx.contractCall(
         "stacking-stat",
         "set-strategy",
         [types.uint(1), types.uint(100)],
-        wallet1.address
+        deployer.address // Use the deployer's address
       ),
     ]);
     if (
@@ -113,7 +135,21 @@ Clarinet.test({
     ]);
     assertEquals(block.receipts[0].result, "(ok u500)");
 
-    // Check the total pooled stx
+    // Check the user details after addition
+    block = chain.mineBlock([
+      Tx.contractCall(
+        "stacking-stat",
+        "get-user-details",
+        [types.uint(2)],
+        wallet1.address // changed from wallet2.address
+      ),
+    ]);
+    assertEquals(
+      block.receipts[0].result,
+      `(some (tuple (amount u500) (strategy-id u1)))`
+    );
+
+    // Check the...total pooled stx
     block = chain.mineBlock([
       Tx.contractCall(
         "stacking-stat",
@@ -157,7 +193,7 @@ Clarinet.test({
     ]);
     assertEquals(
       block.receipts[0].result,
-      "(ok (tuple (amount u300) (strategy-id u1)))"
+      `(some (tuple (amount u300) (strategy-id u1)))`
     );
   },
 });
@@ -203,6 +239,11 @@ Clarinet.test({
   async fn(chain: Chain, accounts: Map<string, Account>) {
     let wallet1 = accounts.get("wallet_1")!;
 
+    // Initialize the contract with wallet1 as the owner
+    chain.mineBlock([
+      Tx.contractCall("stacking-stat", "init", [], wallet1.address),
+    ]);
+
     // Add a strategy with the owner account
     let block = chain.mineBlock([
       Tx.contractCall(
@@ -236,7 +277,7 @@ Clarinet.test({
     ]);
     assertEquals(
       block.receipts[0].result,
-      "(ok (tuple (active false) (allocation u100)))"
+      "(some {active: false, allocation: u100})"
     );
 
     // Resume the strategy
@@ -261,7 +302,7 @@ Clarinet.test({
     ]);
     assertEquals(
       block.receipts[0].result,
-      "(ok (tuple (active true) (allocation u100)))"
+      "(some {active: true, allocation: u100})"
     );
   },
 });
