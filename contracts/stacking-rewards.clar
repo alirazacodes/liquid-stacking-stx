@@ -11,9 +11,11 @@
 (define-constant ERR-INSUFFICIENT-BALANCE u4)
 (define-constant ERR-MAX-USERS-REACHED u5)
 (define-constant ERR-NOT-A-USER u6)
+(define-constant ERR-MAX-STX-STACKABLE-REACHED u7)
 
 ;; Constant to define the owner of the contract
 (define-constant contract-owner tx-sender)
+(define-constant MAX-STX-STACKABLE u200)
 
 ;; Map to store total stacked STX and total rewards
 (define-data-var total-stacked-stx uint u0)
@@ -57,6 +59,7 @@
     (current-user-list (var-get user-list))
   )
     (asserts! (< (len current-user-list) u200) (err ERR-MAX-USERS-REACHED))
+    (asserts! (<= amount MAX-STX-STACKABLE) (err ERR-MAX-STX-STACKABLE-REACHED)) ;; added this line
     (var-set user-list (unwrap-panic (as-max-len? (append current-user-list tx-sender) u200)))
     (if (is-none user-entry)
       (begin

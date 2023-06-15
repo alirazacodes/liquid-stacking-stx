@@ -37,7 +37,7 @@ Clarinet.test({
         user.address
       ),
     ]);
-    assertEquals(block.receipts[0].result, "(err u5)");
+    assertEquals(block.receipts[0].result, "(err u7)");
   },
 });
 
@@ -71,6 +71,13 @@ Clarinet.test({
   async fn(chain: Chain, accounts: Map<string, Account>) {
     let user = accounts.get("wallet_1");
     let block = chain.mineBlock([
+      // Stack 50 STX for the user
+      Tx.contractCall(
+        "stacking-rewards",
+        "stack-stx",
+        [types.uint(50)],
+        user.address
+      ),
       // Try to unstack more STX than the user has stacked
       Tx.contractCall(
         "stacking-rewards",
@@ -79,7 +86,7 @@ Clarinet.test({
         user.address
       ),
     ]);
-    assertEquals(block.receipts[0].result, "(err u4)");
+    assertEquals(block.receipts[1].result, "(err u4)");
   },
 });
 
@@ -115,7 +122,7 @@ Clarinet.test({
   async fn(chain: Chain, accounts: Map<string, Account>) {
     let user = accounts.get("wallet_1");
     let contractOwner = accounts.get("deployer");
-    let block = chain.mineBlock([
+    let block1 = chain.mineBlock([
       // Stack some STX
       Tx.contractCall(
         "stacking-rewards",
@@ -130,12 +137,23 @@ Clarinet.test({
         [types.uint(1000)],
         contractOwner.address
       ),
+      // Distribute rewards
+      Tx.contractCall(
+        "stacking-rewards",
+        "distribute-rewards",
+        [],
+        contractOwner.address
+      ),
+    ]);
+    assertEquals(block1.receipts[0].result, "(ok true)");
+    assertEquals(block1.receipts[1].result, "(ok true)");
+    assertEquals(block1.receipts[2].result, "(ok true)");
+
+    let block2 = chain.mineBlock([
       // Withdraw rewards
       Tx.contractCall("stacking-rewards", "withdraw-rewards", [], user.address),
     ]);
-    assertEquals(block.receipts[0].result, "(ok true)");
-    assertEquals(block.receipts[1].result, "(ok true)");
-    assertEquals(block.receipts[2].result, "(ok u1000)");
+    assertEquals(block2.receipts[0].result, "(ok u1000)");
   },
 });
 
@@ -179,13 +197,11 @@ Clarinet.test({
         user.address
       ),
     ]);
-    let call = Tx.contractCall(
+    let receipt = await chain.callReadOnlyFn(
       "stacking-rewards",
       "get-user-details",
-      [types.principal(user.address)],
-      user.address
+      [types.principal(user.address)]
     );
-    let receipt = await chain.callReadOnlyFn(call);
     assertEquals(
       receipt.result,
       '(ok (some {"stacked-stx": u100, "sbtc-rewards": u0}))'
