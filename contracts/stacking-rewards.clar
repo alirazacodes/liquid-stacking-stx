@@ -20,7 +20,7 @@
 (define-data-var total-rewards uint u0)
 ;; Define a list of all users
 (define-data-var user-list (list 200 principal) (list))
-(define-data-var conversion-rate uint u0) ; The conversion rate from BTC to STX, represented as an integer
+(define-data-var conversion-rate uint u0) ;; The conversion rate from BTC to STX, represented as an integer
 
 
 ;; Map to store user's STX stacks and rewards
