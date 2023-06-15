@@ -10,21 +10,24 @@
 (define-constant ERR-INVALID-AMOUNT u3)
 (define-constant ERR-INSUFFICIENT-BALANCE u4)
 (define-constant ERR-MAX-USERS-REACHED u5)
+(define-constant ERR-NOT-A-USER u6)
 
 ;; Constant to define the owner of the contract
 (define-constant contract-owner tx-sender)
-
-;; Map to store user's STX stacks and rewards
-(define-map users
-  principal
-  {stacked-stx: uint, sbtc-rewards: uint}
-)
 
 ;; Map to store total stacked STX and total rewards
 (define-data-var total-stacked-stx uint u0)
 (define-data-var total-rewards uint u0)
 ;; Define a list of all users
 (define-data-var user-list (list 200 principal) (list))
+(define-data-var conversion-rate uint u0) ; The conversion rate from BTC to STX, represented as an integer
+
+
+;; Map to store user's STX stacks and rewards
+(define-map users
+  principal
+  {stacked-stx: uint, sbtc-rewards: uint}
+)
 
 ;; Check if caller is contract owner
 (define-private (is-contract-owner)
@@ -53,6 +56,7 @@
     (user-entry (map-get? users tx-sender))
     (current-user-list (var-get user-list))
   )
+    (asserts! (< (len current-user-list) u200) (err ERR-MAX-USERS-REACHED))
     (var-set user-list (unwrap-panic (as-max-len? (append current-user-list tx-sender) u200)))
     (if (is-none user-entry)
       (begin
@@ -67,6 +71,36 @@
   )
 )
 
+
+(define-public (unstack-stx (amount uint))
+  (let (
+    (user-entry (unwrap-panic (map-get? users tx-sender)))
+    (current-user-list (var-get user-list))
+  )
+    (asserts! (>= (get stacked-stx user-entry) amount) (err ERR-INSUFFICIENT-BALANCE))
+    (map-set users tx-sender {stacked-stx: (- (get stacked-stx user-entry) amount), sbtc-rewards: (get sbtc-rewards user-entry)})
+    (var-set total-stacked-stx (- (var-get total-stacked-stx) amount))
+    (ok true)
+  )
+)
+
+(define-public (withdraw-rewards)
+  (let (
+    (user-entry (unwrap-panic (map-get? users tx-sender)))
+  )
+    (map-set users tx-sender {stacked-stx: (get stacked-stx user-entry), sbtc-rewards: u0})
+    (ok (get sbtc-rewards user-entry))
+  )
+)
+
+
+;; (define-public (convert-rewards (btc-amount uint))
+;;   (let (
+;;     (conversion-rate (unwrap-panic (contract-call? .oracle-contract get-btc-stx-rate u1)))
+;;   )
+;;     (ok (* btc-amount conversion-rate))
+;;   )
+;; )
 
 ;; Function to convert rewards
 (define-public (convert-rewards (btc-amount uint))
