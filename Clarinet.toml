@@ -10,6 +10,11 @@ path = 'contracts/liquid-stacking.clar'
 clarity_version = 1
 epoch = 2.0
 
+[contracts.stacking-rewards]
+path = 'contracts/stacking-rewards.clar'
+clarity_version = 1
+epoch = 2.0
+
 [contracts.stacking-stat]
 path = 'contracts/stacking-stat.clar'
 clarity_version = 1
